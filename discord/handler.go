@@ -2,14 +2,14 @@ package discord
 
 import (
 	"log"
-	"strings"
 	"os"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/oudentabetai/dc-bot/gifmaker"
 	"github.com/oudentabetai/dc-bot/pterodactyl"
 	"github.com/oudentabetai/dc-bot/storage"
 	"github.com/oudentabetai/dc-bot/utils"
-	"github.com/oudentabetai/dc-bot/gifmaker"
 )
 
 func HelpCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -280,7 +280,7 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	attachmentURL := attachment.ProxyURL // URL でも動きますが、ProxyURL の方が確実です
 
 	// 4. GIF変換処理の実行
-	err = gifmaker.ConvertToGif(attachmentURL)
+	file, err := gifmaker.ConvertToGif(attachmentURL)
 	if err != nil {
 		log.Printf("GIF変換エラー: %v", err)
 		errorMsg := "❌ GIFの生成に失敗しました。"
@@ -292,24 +292,13 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// 関数が正常終了、またはエラー終了する際に、生成された一時GIFファイルを必ず削除する
 	defer os.Remove("out.gif")
 
-	// 5. 生成されたGIFファイルを開く
-	file, err := os.Open("./gif/out.gif")
-	if err != nil {
-		log.Printf("ファイルのオープンに失敗: %v", err)
-		errorMsg := "❌ 生成されたファイルの読み込みに失敗しました。"
-		_, _ = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content: &errorMsg,
-		})
-		return
-	}
-	defer file.Close() // 送信が終わったらファイルを閉じる
 	msg, err := s.ChannelMessageSendComplex(storage.Envs.LOG_CHANNEL_ID, &discordgo.MessageSend{
-    Files: []*discordgo.File{
-        {
-            Name:   "animation.gif",
-            Reader: file,
-        },
-    },
+		Files: []*discordgo.File{
+			{
+				Name:   "animation.gif",
+				Reader: file,
+			},
+		},
 	})
 	if err != nil {
 		log.Println("メッセージ送信エラー:", err)

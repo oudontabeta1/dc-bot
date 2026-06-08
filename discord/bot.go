@@ -2,12 +2,14 @@ package discord
 
 import (
 	"log"
+	"path/filepath"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/oudentabetai/dc-bot/gifmaker"
+	"github.com/oudentabetai/dc-bot/linkfixer"
 	"github.com/oudentabetai/dc-bot/pterodactyl"
 	"github.com/oudentabetai/dc-bot/storage"
-	"github.com/oudentabetai/dc-bot/linkfixer"
 )
 
 var (
@@ -36,15 +38,55 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}()
 
-	if m == nil || m.Author == nil {
+	// 自分のメッセージは無視する（無限ループ防止のベストプラクティス）
+	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
-	linkfixer.Main(s, m)
+	if m.Content == "!gif" {
+		// 添付ファイルが存在するかチェック
+		var att *discordgo.MessageAttachment
+		if len(m.Attachments) > 0 {
+			att = m.Attachments[0] // 1つ目の添付ファイルを取得
+		} else if m.ReferencedMessage != nil {
+			att = m.ReferencedMessage.Attachments[0]
+		}
+		switch filepath.Ext(att.Filename) {
+		case ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif":
+			// 💡 変換関数が io.Reader (file) を返すと仮定
+			log.Print(att.URL)
+			file, err := gifmaker.ConvertToGif(att.URL)
+			if err != nil {
+				log.Printf("Failed to Convert gif: %v", err)
+				return // エラー時は送信処理をスキップ
+			}
 
-	//TextCommand(s, m)
+			message := &discordgo.MessageSend{
+				// 💡 []*discordgo.File のスライス形式にする
+				Files: []*discordgo.File{
+					{
+						Name:   "out.gif",
+						Reader: file, // 💡 定義した file を使用
+					},
+				},
+				Reference: &discordgo.MessageReference{
+					MessageID: m.ID,
+					ChannelID: m.ChannelID,
+					GuildID:   m.GuildID,
+				},
+			}
+
+			_, err = s.ChannelMessageSendComplex(m.ChannelID, message)
+			if err != nil {
+				log.Printf("メッセージ送信エラー: %v", err)
+			}
+		}
+	} else {
+		linkfixer.ConvertMessage(m.Content)
+	}
 }
 
+//TextCommand(s, m)
 
 func TextCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	u := m.Author
