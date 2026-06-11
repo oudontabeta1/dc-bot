@@ -139,14 +139,13 @@ func Main(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 	if m.GuildID == "1238890574132809798" {
-		log.Print("fucked")
 		return
 	}
 	content := m.Content
-	 converted, changed := ConvertMessage(content)
-	 if changed {
-		 s.ChannelMessageDelete(m.ChannelID, m.ID)
-		 SendCovertedMessage(s, m, content, converted)
+	converted, changed := ConvertMessage(content)
+	if changed {
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
+		SendCovertedMessage(s, m, content, converted)
 	}
 }
 
@@ -205,11 +204,11 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			return
 		}
 
-		sendDeleteLog(s, i.ChannelID, "Deleted message by: " + operator + "\nContent: " + i.Message.Content)
+		sendDeleteLog(s, i.ChannelID, "Deleted message by: "+operator+"\nContent: "+i.Message.Content)
 
 		deleteLog := "Deleted message by: " + operator + "\n"
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content:    &deleteLog,
+			Content: &deleteLog,
 		})
 
 		err = s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
