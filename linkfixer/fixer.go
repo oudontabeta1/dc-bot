@@ -47,6 +47,56 @@ var conversionRules = []struct {
 	},
 }
 
+func createButtons(originalURL string, button []string) []discordgo.MessageComponent {
+	var Buttons = []discordgo.Button{
+		{
+			Label: "Open",
+			Style: discordgo.LinkButton,
+			URL:   originalURL,
+		},
+		{
+			Label:    "Original",
+			Style:    discordgo.PrimaryButton,
+			CustomID: "origin",
+		},
+		{
+			Label:    "Translate",
+			Style:    discordgo.PrimaryButton,
+			CustomID: "translate",
+		},
+		{
+			Label:    "Spoiler",
+			Style:    discordgo.SecondaryButton,
+			CustomID: "spoiler",
+		},
+		{
+			Label:    "Delete",
+			Style:    discordgo.DangerButton,
+			CustomID: "delete",
+		},
+	}
+	var filteredButtons []discordgo.MessageComponent
+
+	for _, btn := range Buttons {
+		for _, label := range button {
+			if btn.Label == label {
+				filteredButtons = append(filteredButtons, btn)
+				break
+			}
+		}
+	}
+	if len(filteredButtons) == 0 {
+		return nil
+	}
+
+	// Discordの仕様上、ActionsRowでラップして返す必要がある
+	return []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: filteredButtons,
+		},
+	}
+}
+
 // ConvertMessage はメッセージ内のURLを条件に応じて変換する
 func ConvertMessage(msg string) (string, bool) {
 	for _, rule := range conversionRules {
@@ -83,36 +133,28 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 		originalURL = originalContent
 	}
 
-	_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-		Content: "`" + "replaced message sent by: " + m.Author.Username + "`" + "\n" + convertedContent,
-		Components: []discordgo.MessageComponent{
-			&discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					// 1つ目のボタン
-					discordgo.Button{
-						Label: "Open",
-						Style: discordgo.LinkButton,
-						URL:   originalURL,
-					},
-					// 2つ目のボタン
-					discordgo.Button{
-						Label:    "Spoiler",
-						Style:    discordgo.PrimaryButton,
-						CustomID: "spoiler",
-					},
-					// 3つ目のボタン
-					discordgo.Button{
-						Label:    "Delete",
-						Style:    discordgo.DangerButton,
-						CustomID: "delete",
-					},
+	convertedContent, _, _ = strings.Cut(convertedContent, "?")
+
+	if strings.HasPrefix(convertedContent, "https://fxtwitter.com") || strings.HasPrefix(convertedContent, "https://x.com") {
+		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+			Content:    "Message by: " + m.Author.Username + "\n" + convertedContent + "/ja",
+			Components: createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}),
+		})
+		if err != nil {
+			log.Printf("メッセージ送信失敗: %v", err)
+		}
+	} else {
+		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+			Content: "`" + "replaced message sent by: " + m.Author.Username + "`" + "\n" + convertedContent + "/ja",
+			Components: []discordgo.MessageComponent{
+				&discordgo.ActionsRow{
+					Components: createButtons(originalURL, []string{"Open", "Spoiler", "Delete"}),
 				},
 			},
-		},
-	})
-
-	if err != nil {
-		log.Printf("メッセージ送信失敗: %v", err)
+		})
+		if err != nil {
+			log.Printf("メッセージ送信失敗: %v", err)
+		}
 	}
 }
 
@@ -215,6 +257,53 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if err != nil {
 			log.Printf("failed to delete message: %v", err)
 		}
+
+	case "origin":
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredMessageUpdate,
+		})
+		if err != nil {
+			log.Printf("origin interaction defer failed: %v", err)
+			return
+		}
+
+		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
+			return r == '\n' || r == '\r'
+		})
+		rawURL, _, _ := strings.Cut(content[1], "/ja")
+
+		convertedContent := content[0] + "\n" + rawURL
+		originalURL := strings.ReplaceAll(rawURL, "fxtwitter.com", "x.com")
+		components := createButtons(originalURL, []string{"Open", "Translate", "Spoiler", "Delete"})
+
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content:    &convertedContent,
+			Components: &components,
+		})
+
+	case "translate":
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredMessageUpdate,
+		})
+		if err != nil {
+			log.Printf("translate interaction defer failed: %v", err)
+			return
+		}
+		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
+			return r == '\n' || r == '\r'
+		})
+		rawURL := content[1] + "/ja"
+
+		convertedContent := content[0] + "\n" + rawURL
+
+		originalURL := strings.ReplaceAll(content[1], "fxtwitter.com", "x.com")
+
+		components := createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}) // &ActionsRowで包まない
+
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content:    &convertedContent,
+			Components: &components,
+		})
 
 	default:
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

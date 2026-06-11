@@ -82,7 +82,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 	} else {
-		linkfixer.ConvertMessage(m.Content)
+		linkfixer.Main(s, m)
 	}
 }
 
