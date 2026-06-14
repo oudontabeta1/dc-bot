@@ -105,7 +105,7 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 
 	if strings.HasPrefix(convertedContent, "https://fxtwitter.com") {
 		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-			Content:    "Message by: " + m.Author.Username + "\n" + convertedContent + "/ja",
+			Content:    "Message by: " + m.Author.Username + "\n" + convertedContent + "/ja/",
 			Components: createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}),
 		})
 		if err != nil {
@@ -199,7 +199,7 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
-		rawURL, _, _ := strings.Cut(content[1], "/ja")
+		rawURL, _, _ := strings.Cut(content[1], "/ja/")
 
 		convertedContent := content[0] + "\n" + rawURL
 		originalURL := strings.ReplaceAll(rawURL, "fxtwitter.com", "x.com")
@@ -217,7 +217,7 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
-		rawURL := content[1] + "/ja"
+		rawURL := content[1] + "/ja/"
 
 		convertedContent := content[0] + "\n" + rawURL
 
