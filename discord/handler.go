@@ -56,7 +56,6 @@ func HelpCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 }
 
 func ServersCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// 1. 保留応答
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -68,7 +67,6 @@ func ServersCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate)
 		return
 	}
 
-	// 2. サーバー情報取得
 	accesibleServers := utils.GetAccessibleServers(i.Member)
 
 	if accesibleServers == nil {
@@ -79,7 +77,6 @@ func ServersCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate)
 		})
 		return
 	}
-	// 3. 正常終了（Embedを表示）
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{utils.ListServers(accesibleServers)},
 	})
@@ -179,7 +176,7 @@ func RoleCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	if i.Member.User.ID != OWNER_ID {
+	if i.Member.User.ID != storage.Envs.OWNER_ID {
 		errorMsg := "❌ このコマンドを使用する権限がありません。"
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: &errorMsg,
@@ -252,7 +249,6 @@ func RoleCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 }
 
 func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// 1. 即座に「考え中...」のレスポンスを返す（3秒ルール対策）
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -264,7 +260,6 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	// 2. オプションの存在チェックと型チェック
 	options := i.ApplicationCommandData().Options
 	if len(options) == 0 || options[0].Type != discordgo.ApplicationCommandOptionAttachment {
 		errorMsg := "❌ 添付ファイルが必要です。"
@@ -274,12 +269,10 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	// 3. 添付ファイルのURLを取得（安全のためProxyURLを推奨）
 	attachmentID := options[0].Value.(string)
 	attachment := i.ApplicationCommandData().Resolved.Attachments[attachmentID]
-	attachmentURL := attachment.ProxyURL // URL でも動きますが、ProxyURL の方が確実です
+	attachmentURL := attachment.ProxyURL
 
-	// 4. GIF変換処理の実行
 	file, err := gifmaker.ConvertToGif(attachmentURL)
 	if err != nil {
 		log.Printf("GIF変換エラー: %v", err)
@@ -289,7 +282,6 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		})
 		return
 	}
-	// 関数が正常終了、またはエラー終了する際に、生成された一時GIFファイルを必ず削除する
 	defer os.Remove("out.gif")
 
 	msg, err := s.ChannelMessageSendComplex(storage.Envs.LOG_CHANNEL_ID, &discordgo.MessageSend{
@@ -306,7 +298,6 @@ func GifCommandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 	attachmentURL = msg.Attachments[0].URL
 
-	// 6. 完了したGIFファイルをDiscordに送信（InteractionResponseEdit）
 	successMsg := "🎉 GIFの生成が完了しました！\n" + attachmentURL
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Content: &successMsg,

@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/oudentabetai/dc-bot/linkfixer"
 	"github.com/oudentabetai/dc-bot/storage"
 	"github.com/oudentabetai/dc-bot/utils"
-	"github.com/oudentabetai/dc-bot/linkfixer"
 )
 
 var (
@@ -170,12 +170,6 @@ func SyncCommands(s *discordgo.Session, guildID string, appID string) {
 
 func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type == discordgo.InteractionMessageComponent {
-		ignoreChannelIDs := strings.Split(storage.Envs.IGNORE_CHANNEL_IDS, ",")
-		for _, id := range ignoreChannelIDs {
-			if strings.TrimSpace(id) == i.ChannelID {
-				return
-			}
-		}
 		linkfixer.OnButton(s, i)
 		return
 	}

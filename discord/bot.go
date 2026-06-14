@@ -13,8 +13,7 @@ import (
 )
 
 var (
-	suffix   string = "!!"
-	OWNER_ID string = "967088187405107220"
+	suffix string = "!!"
 )
 
 type SessionManager interface {
@@ -38,35 +37,31 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}()
 
-	// 自分のメッセージは無視する（無限ループ防止のベストプラクティス）
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
 	if m.Content == "!gif" {
-		// 添付ファイルが存在するかチェック
 		var att *discordgo.MessageAttachment
 		if len(m.Attachments) > 0 {
-			att = m.Attachments[0] // 1つ目の添付ファイルを取得
+			att = m.Attachments[0]
 		} else if m.ReferencedMessage != nil {
 			att = m.ReferencedMessage.Attachments[0]
 		}
 		switch filepath.Ext(att.Filename) {
 		case ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif":
-			// 💡 変換関数が io.Reader (file) を返すと仮定
 			log.Print(att.URL)
 			file, err := gifmaker.ConvertToGif(att.URL)
 			if err != nil {
 				log.Printf("Failed to Convert gif: %v", err)
-				return // エラー時は送信処理をスキップ
+				return
 			}
 
 			message := &discordgo.MessageSend{
-				// 💡 []*discordgo.File のスライス形式にする
 				Files: []*discordgo.File{
 					{
 						Name:   "out.gif",
-						Reader: file, // 💡 定義した file を使用
+						Reader: file,
 					},
 				},
 				Reference: &discordgo.MessageReference{
@@ -82,7 +77,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 	} else {
-		linkfixer.Main(s, m)
+		linkfixer.LinkFixer(s, m)
 	}
 }
 
@@ -101,8 +96,9 @@ func TextCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		}
 		if strings.HasPrefix(m.Content, suffix+"setrole") {
-			if m.Author.ID != OWNER_ID {
-				log.Print("User does not have permission to set role: " + OWNER_ID + " vs " + m.Author.ID)
+			ownerID := storage.Envs.OWNER_ID
+			if m.Author.ID != ownerID {
+				log.Print("User does not have permission to set role: " + ownerID + " vs " + m.Author.ID)
 				s.ChannelMessageSend(m.ChannelID, "このコマンドを使用する権限がありません。")
 				return
 			}

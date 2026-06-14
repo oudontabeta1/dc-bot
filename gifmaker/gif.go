@@ -33,7 +33,6 @@ func ConvertToGif(attachmentURL string) (file io.Reader, err error) {
 	}
 	defer out.Close()
 
-	// 2. HTTPレスポンスのBodyをファイルにコピー（書き込み）する
 	written, err := io.Copy(out, res.Body)
 	if err != nil {
 		log.Printf("Failed to save image: %v", err)
@@ -42,14 +41,11 @@ func ConvertToGif(attachmentURL string) (file io.Reader, err error) {
 
 	log.Printf("Successfully saved %d bytes to %s", written, filePath)
 
-	// 一時ファイルのパスを設定
 	palettePath := "./gif/palette.png"
 	tmpOutput := "./gif/out.gif"
 
-	// 処理完了後にパレット用の一時画像は確実に削除する
 	defer os.Remove(palettePath)
 
-	// 1. palettegen パス: 最適なパレット画像(256色)を生成
 	fmt.Println("[1/2] 最適なカラーパレットを生成中...")
 	err = ffmpeg.Input(filePath).
 		Output(palettePath, ffmpeg.KwArgs{"vf": "palettegen"}).
@@ -59,7 +55,6 @@ func ConvertToGif(attachmentURL string) (file io.Reader, err error) {
 		return nil, fmt.Errorf("palettegen エラー: %w", err)
 	}
 
-	// 2. paletteuse パス: 生成したパレットを使って最高画質でGIF化
 	fmt.Println("[2/2] パレットを適用してGIFを出力中...")
 	err = ffmpeg.Filter(
 		[]*ffmpeg.Stream{
