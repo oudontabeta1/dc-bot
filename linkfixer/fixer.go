@@ -157,14 +157,6 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	switch customID {
 	case "spoiler":
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredMessageUpdate,
-		})
-		if err != nil {
-			log.Printf("spoiler interaction defer failed: %v", err)
-			return
-		}
-
 		var resultContent string
 		contents := strings.Split(i.Message.Content, "\n")
 		if strings.Contains(contents[1], "|") {
@@ -174,24 +166,15 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			resultContent = contents[0] + "\n||" + strings.Join(contents[1:], "\n") + "||"
 		}
 
-		_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content:    &resultContent,
-			Components: &i.Message.Components,
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+			Data: &discordgo.InteractionResponseData{
+				Content:    resultContent,
+				Components: i.Message.Components,
+			},
 		})
-		if err != nil {
-			log.Printf("spoiler interaction edit failed: %v", err)
-			return
-		}
 
 	case "delete":
-		//err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		//	Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-		//})
-		//if err != nil {
-		//	log.Printf("delete interaction defer failed: %v", err)
-		//	return
-		//}
-		//
 		content := i.Message.Content
 
 		err := s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
@@ -213,14 +196,6 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		}
 
 	case "origin":
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredMessageUpdate,
-		})
-		if err != nil {
-			log.Printf("origin interaction defer failed: %v", err)
-			return
-		}
-
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
@@ -230,19 +205,15 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		originalURL := strings.ReplaceAll(rawURL, "fxtwitter.com", "x.com")
 		components := createButtons(originalURL, []string{"Open", "Translate", "Spoiler", "Delete"})
 
-		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content:    &convertedContent,
-			Components: &components,
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+			Data: &discordgo.InteractionResponseData{
+				Content:    convertedContent,
+				Components: components,
+			},
 		})
 
 	case "translate":
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredMessageUpdate,
-		})
-		if err != nil {
-			log.Printf("translate interaction defer failed: %v", err)
-			return
-		}
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
@@ -254,9 +225,12 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 		components := createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}) // &ActionsRowで包まない
 
-		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content:    &convertedContent,
-			Components: &components,
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+			Data: &discordgo.InteractionResponseData{
+				Content:    convertedContent,
+				Components: components,
+			},
 		})
 
 	default:
