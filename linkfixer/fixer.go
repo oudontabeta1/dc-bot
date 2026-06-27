@@ -56,12 +56,12 @@ func createButtons(originalURL string, button []string) []discordgo.MessageCompo
 		},
 		{
 			Label:    "Original",
-			Style:    discordgo.PrimaryButton,
+			Style:    discordgo.SecondaryButton,
 			CustomID: "origin",
 		},
 		{
 			Label:    "Translate",
-			Style:    discordgo.PrimaryButton,
+			Style:    discordgo.SecondaryButton,
 			CustomID: "translate",
 		},
 		{
@@ -71,7 +71,7 @@ func createButtons(originalURL string, button []string) []discordgo.MessageCompo
 		},
 		{
 			Label:    "Delete",
-			Style:    discordgo.DangerButton,
+			Style:    discordgo.SecondaryButton,
 			CustomID: "delete",
 		},
 	}
@@ -105,7 +105,7 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 
 	if strings.HasPrefix(convertedContent, "https://fxtwitter.com") {
 		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-			Content:    "Message by: " + m.Author.Username + "\n" + convertedContent + "/ja/",
+			Content:    "User: " + m.Author.Username + "\n" + convertedContent + "/ja",
 			Components: createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}),
 		})
 		if err != nil {
@@ -113,7 +113,7 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 		}
 	} else {
 		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-			Content: "`" + "replaced message sent by: " + m.Author.Username + "`" + "\n" + convertedContent + "/ja",
+			Content: "`" + "replaced message sent by: " + m.Author.DisplayName() + "`" + "\n" + convertedContent + "/ja",
 			Components: []discordgo.MessageComponent{
 				&discordgo.ActionsRow{
 					Components: createButtons(originalURL, []string{"Open", "Spoiler", "Delete"}),
@@ -160,10 +160,12 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		var resultContent string
 		contents := strings.Split(i.Message.Content, "\n")
 		if strings.Contains(contents[1], "|") {
-			cleanedContent := strings.ReplaceAll(contents[1], "|", "")
+			var cleanedContent string
+			cleanedContent = strings.ReplaceAll(contents[1], "||", "")
+
 			resultContent = contents[0] + "\n" + cleanedContent
 		} else {
-			resultContent = contents[0] + "\n||" + strings.Join(contents[1:], "\n") + "||"
+			resultContent = contents[0] + "\n||" + strings.Join(contents[1:], "\n") + " ||"
 		}
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -199,10 +201,20 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
-		rawURL, _, _ := strings.Cut(content[1], "/ja/")
 
-		convertedContent := content[0] + "\n" + rawURL
+		spoilered := strings.Contains(content[1], "||")
+		cleanURL := strings.ReplaceAll(content[1], "||", "")
+		cleanURL = strings.TrimSpace(cleanURL)
+		rawURL := strings.TrimSuffix(cleanURL, "/ja")
+
+		displayContent := rawURL
+		if spoilered {
+			displayContent = "||" + rawURL + " ||"
+		}
+
+		convertedContent := content[0] + "\n" + displayContent
 		originalURL := strings.ReplaceAll(rawURL, "fxtwitter.com", "x.com")
+
 		components := createButtons(originalURL, []string{"Open", "Translate", "Spoiler", "Delete"})
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -217,14 +229,17 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
-		rawURL := content[1] + "/ja/"
-
-		convertedContent := content[0] + "\n" + rawURL
-
-		originalURL := strings.ReplaceAll(content[1], "fxtwitter.com", "x.com")
-
-		components := createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}) // &ActionsRowで包まない
-
+		spoilered := strings.Contains(content[1], "||")
+		cleanURL := strings.ReplaceAll(content[1], "||", "")
+		cleanURL = strings.TrimSpace(cleanURL)
+		rawURL := cleanURL + "/ja"
+		displayContent := rawURL
+		if spoilered {
+			displayContent = "||" + rawURL + " ||"
+		}
+		convertedContent := content[0] + "\n" + displayContent
+		originalURL := strings.ReplaceAll(cleanURL, "fxtwitter.com", "x.com")
+		components := createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"})
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseUpdateMessage,
 			Data: &discordgo.InteractionResponseData{
