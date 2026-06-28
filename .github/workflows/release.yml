@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: "1.22"
 
       # 3. 依存関係（go.sum）の同期・解決
       - name: Tidy Go Modules
@@ -40,4 +40,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # サーバー側が検知できるように、実行時の日付ベースでバージョンタグを強制上書き
-          GORELEASER_CURRENT_TAG: "v2026.06.05-${{ github.run_number }}"
+          GORELEASER_CURRENT_TAG: "v${{ steps.date.outputs.today }}-${{ github.run_number }}"
