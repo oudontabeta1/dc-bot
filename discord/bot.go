@@ -88,7 +88,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	linkfixer.LinkFixer(s, m)
+	linkfixer.LinkFixer(s, m, nil, nil, nil)
 	//TextCommand(s, m)
 }
 

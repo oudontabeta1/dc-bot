@@ -8,6 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/oudentabetai/dc-bot/discord"
+	"github.com/oudentabetai/dc-bot/linkfixer"
 	"github.com/oudentabetai/dc-bot/storage"
 )
 
@@ -37,10 +38,13 @@ func main() {
 	}
 	defer dgs.Close()
 
+	// REST APIサーバーにDiscordセッションを渡し、並行起動
+	server := linkfixer.NewServer(dgs)
+	server.Start(":8081")
+
 	sendStartupVersionLog(dgs)
 	log.Println("Launched")
 
-	//deleteAllGlobalCommands(dgs, os.Getenv("APPLICATION_ID"))
 	discord.SyncCommands(dgs, "", storage.Envs.APPLICATION_ID)
 	waitForExitSignal()
 }
@@ -60,14 +64,4 @@ func sendStartupVersionLog(s *discordgo.Session) {
 	if _, err := s.ChannelMessageSend(storage.Envs.LOG_CHANNEL_ID, msg); err != nil {
 		log.Printf("Failed To Send Launch Log: %v", err)
 	}
-}
-
-func deleteAllGlobalCommands(s *discordgo.Session, appID string) {
-	_, err := s.ApplicationCommandBulkOverwrite(appID, "", []*discordgo.ApplicationCommand{})
-
-	if err != nil {
-		log.Printf("Failed To Remove Global Commands: %v", err)
-		return
-	}
-	log.Println("Succesfully Removed Global Commands。")
 }
