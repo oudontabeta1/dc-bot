@@ -1,43 +1,34 @@
 name: Release
-
 on:
   push:
     branches:
       - release
-
 permissions:
-  contents: write # GitHub Releasesにバイナリを投稿するために必須
-
+  contents: write
 jobs:
   releaser:
     runs-on: ubuntu-latest
     steps:
-      # 1. ソースコードの取得
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # GoReleaserがコミット履歴を解析するために必要
-
-      # 2. Go環境のセットアップ
+          fetch-depth: 0
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-
-      # 3. 依存関係（go.sum）の同期・解決
+          go-version: '1.22'
       - name: Tidy Go Modules
         run: |
           go mod tidy
-
-      # 4. GoReleaser の実行
+      - name: Get current date
+        id: date
+        run: echo "today=$(date -u +'%Y.%m.%d')" >> "$GITHUB_OUTPUT"
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          # --skip=validate でGit Tagと現在のコミットの厳密な一致チェックをスキップします
           args: release --clean --skip=validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # サーバー側が検知できるように、実行時の日付ベースでバージョンタグを強制上書き
           GORELEASER_CURRENT_TAG: "v${{ steps.date.outputs.today }}-${{ github.run_number }}"

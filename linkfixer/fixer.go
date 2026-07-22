@@ -94,7 +94,8 @@ func createButtons(originalURL string, button []string) []discordgo.MessageCompo
 	}
 }
 
-func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, originalContent string, convertedContent string) {
+// m (MessageCreate) 依存を排除し、REST API・Discordイベント双方から呼び出せるように変更
+func SendCovertedMessage(s *discordgo.Session, channelID string, authorName string, originalContent string, convertedContent string) {
 	re := regexp.MustCompile(`https?://[^\s<>]+`)
 	originalURL := re.FindString(originalContent)
 	if originalURL == "" {
@@ -104,21 +105,17 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 	convertedContent, _, _ = strings.Cut(convertedContent, "?")
 
 	if strings.HasPrefix(convertedContent, "https://fxtwitter.com") {
-		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-			Content:    "User: " + m.Author.Username + "\n" + convertedContent + "/ja",
+		_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+			Content:    "User: " + authorName + "\n" + convertedContent + "/ja",
 			Components: createButtons(originalURL, []string{"Open", "Original", "Spoiler", "Delete"}),
 		})
 		if err != nil {
 			log.Printf("メッセージ送信失敗: %v", err)
 		}
 	} else {
-		_, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
-			Content: "`" + "replaced message sent by: " + m.Author.DisplayName() + "`" + "\n" + convertedContent + "/ja",
-			Components: []discordgo.MessageComponent{
-				&discordgo.ActionsRow{
-					Components: createButtons(originalURL, []string{"Open", "Spoiler", "Delete"}),
-				},
-			},
+		_, err := s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+			Content:    "`replaced message sent by: " + authorName + "`\n" + convertedContent + "/ja",
+			Components: createButtons(originalURL, []string{"Open", "Spoiler", "Delete"}),
 		})
 		if err != nil {
 			log.Printf("メッセージ送信失敗: %v", err)
@@ -126,17 +123,43 @@ func SendCovertedMessage(s *discordgo.Session, m *discordgo.MessageCreate, origi
 	}
 }
 
-func LinkFixer(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID || m.GuildID == storage.Envs.IGNORE_GUILD_ID {
+func LinkFixer(s *discordgo.Session, m *discordgo.MessageCreate, url *string, channelID *string, userID *string) {
+	// REST API経由で送られてきた場合の処理
+	if url != nil && channelID != nil && *url != "" && *channelID != "" {
+		targetURL := *url
+		targetChannel := *channelID
+		author := "API"
+		if userID != nil && *userID != "" {
+			user, err := s.User(*userID)
+			if err == nil {
+				author = user.DisplayName()
+			}
+		}
+
+		for _, rule := range conversionRules {
+			if !slices.Contains(rule.exceptions, targetURL) {
+				if strings.Contains(targetURL, rule.prefix) {
+					converted := strings.ReplaceAll(targetURL, rule.prefix, rule.replaceTo)
+					SendCovertedMessage(s, targetChannel, author, targetURL, converted)
+					return
+				}
+			}
+		}
 		return
 	}
+
+	// 通常のDiscordメッセージイベント処理
+	if m == nil || m.Author == nil || m.Author.ID == s.State.User.ID || m.GuildID == storage.Envs.IGNORE_GUILD_ID {
+		return
+	}
+
 	for _, rule := range conversionRules {
 		if !slices.Contains(rule.exceptions, m.Content) {
 			if strings.Contains(m.Content, rule.prefix) {
 				converted := strings.ReplaceAll(m.Content, rule.prefix, rule.replaceTo)
-				SendCovertedMessage(s, m, m.Content, converted)
+				SendCovertedMessage(s, m.ChannelID, m.Author.DisplayName(), m.Content, converted)
 				s.ChannelMessageDelete(m.ChannelID, m.ID)
-				continue
+				break
 			}
 		}
 	}
@@ -159,13 +182,15 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	case "spoiler":
 		var resultContent string
 		contents := strings.Split(i.Message.Content, "\n")
-		if strings.Contains(contents[1], "|") {
-			var cleanedContent string
-			cleanedContent = strings.ReplaceAll(contents[1], "||", "")
 
+		// 要素数のチェックを追加してインデックス範囲外エラーを防止
+		if len(contents) > 1 && strings.Contains(contents[1], "|") {
+			cleanedContent := strings.ReplaceAll(contents[1], "||", "")
 			resultContent = contents[0] + "\n" + cleanedContent
-		} else {
+		} else if len(contents) > 1 {
 			resultContent = contents[0] + "\n||" + strings.Join(contents[1:], "\n") + " ||"
+		} else {
+			resultContent = i.Message.Content
 		}
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -191,16 +216,22 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			return r == '\n' || r == '\r'
 		})
 
-		logContent := "Deleted message by: " + operator + "\nContent: " + url[1]
-		_, err = s.ChannelMessageSend(storage.Envs.LOG_CHANNEL_ID, logContent)
-		if err != nil {
-			log.Printf("failed to send delete log to log channel: %v", err)
+		if len(url) > 1 {
+			logContent := "Deleted message by: " + operator + "\nContent: " + url[1]
+			_, err = s.ChannelMessageSend(storage.Envs.LOG_CHANNEL_ID, logContent)
+			if err != nil {
+				log.Printf("failed to send delete log to log channel: %v", err)
+			}
 		}
 
 	case "origin":
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
+
+		if len(content) < 2 {
+			return
+		}
 
 		spoilered := strings.Contains(content[1], "||")
 		cleanURL := strings.ReplaceAll(content[1], "||", "")
@@ -229,6 +260,11 @@ func OnButton(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		content := strings.FieldsFunc(i.Message.Content, func(r rune) bool {
 			return r == '\n' || r == '\r'
 		})
+
+		if len(content) < 2 {
+			return
+		}
+
 		spoilered := strings.Contains(content[1], "||")
 		cleanURL := strings.ReplaceAll(content[1], "||", "")
 		cleanURL = strings.TrimSpace(cleanURL)
