@@ -25,26 +25,26 @@ var conversionRules = []struct {
 		replaceTo:  "https://fxtwitter.com",
 		exceptions: []string{"https://x.com/"},
 	},
-	{
-		prefix:     "https://www.instagram.com",
-		replaceTo:  "https://www.uuinstagram.com",
-		exceptions: []string{"https://www.instagram.com/"},
-	},
+	// {
+	// 	prefix:     "https://www.instagram.com",
+	// 	replaceTo:  "https://www.uuinstagram.com",
+	// 	exceptions: []string{"https://www.instagram.com/"},
+	// },
 	{
 		prefix:     "https://pixiv.net",
 		replaceTo:  "https://phixiv.net",
 		exceptions: []string{"https://pixiv.net/"},
 	},
-	{
-		prefix:     "https://soundcloud.com",
-		replaceTo:  "https://fxcloud.ofton.dev",
-		exceptions: []string{"https://soundcloud.com/"},
-	},
-	{
-		prefix:     "https://open.spotify.com",
-		replaceTo:  "https://open.fxspotify.com",
-		exceptions: []string{},
-	},
+	// {
+	// 	prefix:     "https://soundcloud.com",
+	// 	replaceTo:  "https://fxcloud.ofton.dev",
+	// 	exceptions: []string{"https://soundcloud.com/"},
+	// },
+	// {
+	// 	prefix:     "https://open.spotify.com",
+	// 	replaceTo:  "https://open.fxspotify.com",
+	// 	exceptions: []string{},
+	// },
 }
 
 func createButtons(originalURL string, button []string) []discordgo.MessageComponent {
